@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dynamic Mark Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #fff;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body.dark-mode {
+      background: #121212;
+      color: #f4f4f4;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    table {
+      width: 100%;
+      max-width: 1000px;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: #fff;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      transition: background 0.3s;
+    }
+
+    body.dark-mode table {
+      background: #1e1e1e;
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #007BFF;
+      color: white;
+    }
+
+    td input {
+      width: 100%;
+      padding: 5px;
+      box-sizing: border-box;
+    }
+
+    .btn {
+      margin: 10px 5px;
+      display: inline-block;
+      padding: 10px 20px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .btn:hover {
+      background: #218838;
+    }
+
+    .highlight {
+      animation: highlightRow 1s ease;
+    }
+
+    @keyframes highlightRow {
+      from { background-color: #FFF; }
+      to { background-color: inherit; }
+    }
+
+    #result {
+      text-align: center;
+      font-size: 1.2em;
+      margin-top: 20px;
+    }
+
+    canvas {
+      max-width: 1000px;
+      margin: 20px auto;
+      display: block;
+    }
+
+    @media screen and (max-width: 600px) {
+      table, th, td {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ibn ROSHD CALCULATORE</h1>
+
+  <table id="marksTable">
+    <thead>
+      <tr>
+        <th>Module</th>
+        <th>Coefficient</th>
+        <th>Assiduite (40%)</th>
+        <th>Examen 60%</th>
+        <th>Total 100%</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><input type="text" placeholder="Module" class="input-field"></td>
+        <td><input type="number" min="1" value="1" class="input-field"></td>
+        <td><input type="number" min="0" max="20" class="input-field"></td>
+        <td><input type="number" min="0" max="20" class="input-field"></td>
+        <td class="total">-</td>
+        <td><button class="btn delete-btn" style="background:#dc3545;">Delete</button></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="text-align:center;">
+    <button class="btn" id="addRow">Add Module</button>
+    <button class="btn" id="loadPredefined">Predefined Modules</button>
+    <button class="btn" id="toggleDark">Dark Mode</button>
+    <button class="btn" id="showBarChart">Distribution</button>
+    <button class="btn" id="showPieChart">Contribution Pie</button>
+  </div>
+
+  <div id="result"></div>
+  <canvas id="chartCanvas"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const table = document.getElementById('marksTable').getElementsByTagName('tbody')[0];
+    const resultDiv = document.getElementById('result');
+    const chartCanvas = document.getElementById('chartCanvas');
+    let currentChart = null;
+
+    function addInputListeners() {
+      const allInputs = document.querySelectorAll('.input-field');
+      allInputs.forEach((input, index) => {
+        input.removeEventListener('input', calculateAll);
+        input.addEventListener('input', calculateAll);
+
+        input.removeEventListener('keydown', handleKeyDown);
+        input.addEventListener('keydown', (e) => handleKeyDown(e, allInputs, index));
+      });
+
+      const deleteButtons = document.querySelectorAll('.delete-btn');
+      deleteButtons.forEach(btn => {
+        btn.onclick = () => {
+          btn.closest('tr').remove();
+          calculateAll();
+        };
+      });
+    }
+
+    function handleKeyDown(e, inputs, index) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const currentInput = inputs[index];
+        const currentRow = currentInput.closest('tr');
+        const rowInputs = currentRow.querySelectorAll('.input-field');
+        const isLastInRow = [...rowInputs].indexOf(currentInput) === rowInputs.length - 1;
+
+        if (!isLastInRow) {
+          rowInputs[[...rowInputs].indexOf(currentInput) + 1].focus();
+        } else {
+          const nextRow = currentRow.nextElementSibling;
+          if (nextRow) {
+            nextRow.querySelector('.input-field').focus();
+          } else {
+            document.getElementById('addRow').click();
+            setTimeout(() => {
+              const newRow = table.lastElementChild;
+              if (newRow) newRow.querySelector('.input-field').focus();
+            }, 100);
+          }
+        }
+      }
+    }
+
+    function calculateAll() {
+      let totalWeightedMarks = 0;
+      let totalCoefficients = 0;
+
+      for (let row of table.rows) {
+        const cells = row.querySelectorAll('td');
+        const coeff = parseFloat(cells[1].querySelector('input').value);
+        const assiduite = parseFloat(cells[2].querySelector('input').value);
+        const exam = parseFloat(cells[3].querySelector('input').value);
+
+        if (!isNaN(coeff) && !isNaN(assiduite) && !isNaN(exam)) {
+          const totalMark = (assiduite * 0.4) + (exam * 0.6);
+          cells[4].textContent = totalMark.toFixed(2);
+          totalWeightedMarks += totalMark * coeff;
+          totalCoefficients += coeff;
+        } else {
+          cells[4].textContent = '-';
+        }
+      }
+
+      if (totalCoefficients > 0) {
+        const moyenne = totalWeightedMarks / totalCoefficients;
+        resultDiv.textContent = `Overall Moyenne: ${moyenne.toFixed(2)} / 20`;
+      } else {
+        resultDiv.textContent = '';
+      }
+    }
+
+    function clearChart() {
+      if (currentChart) {
+        currentChart.destroy();
+        currentChart = null;
+      }
+    }
+
+    function showBarChart() {
+      clearChart();
+      const labels = [], data = [];
+
+      for (let row of table.rows) {
+        const cells = row.querySelectorAll('td');
+        const name = cells[0].querySelector('input').value || 'Unnamed';
+        const total = parseFloat(cells[4].textContent);
+        if (!isNaN(total)) {
+          labels.push(name);
+          data.push(total);
+        }
+      }
+
+      currentChart = new Chart(chartCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Module Total Marks',
+            data: data,
+            backgroundColor: '#007BFF'
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: { duration: 1000 },
+          scales: { y: { beginAtZero: true, max: 20 } }
+        }
+      });
+    }
+
+    function showPieChart() {
+      clearChart();
+      const labels = [], data = [];
+      let totalSum = 0;
+
+      for (let row of table.rows) {
+        const cells = row.querySelectorAll('td');
+        const name = cells[0].querySelector('input').value || 'Unnamed';
+        const coeff = parseFloat(cells[1].querySelector('input').value);
+        const total = parseFloat(cells[4].textContent);
+
+        if (!isNaN(total) && !isNaN(coeff)) {
+          const contribution = total * coeff;
+          totalSum += contribution;
+          labels.push(name);
+          data.push(contribution);
+        }
+      }
+
+      if (totalSum === 0) return;
+
+      const percentages = data.map(val => ((val / totalSum) * 100).toFixed(2));
+
+      currentChart = new Chart(chartCanvas, {
+        type: 'pie',
+        data: {
+          labels: labels.map((l, i) => `${l} (${percentages[i]}%)`),
+          datasets: [{
+            label: 'Contribution',
+            data: data,
+            backgroundColor: labels.map(() => `hsl(${Math.random() * 360}, 70%, 60%)`)
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: { duration: 1000 }
+        }
+      });
+    }
+
+    document.getElementById('addRow').addEventListener('click', () => {
+      const row = table.insertRow();
+      row.classList.add('highlight');
+      row.innerHTML = `
+        <td><input type="text" placeholder="Module" class="input-field"></td>
+        <td><input type="number" min="1" value="1" class="input-field"></td>
+        <td><input type="number" min="0" max="20" class="input-field"></td>
+        <td><input type="number" min="0" max="20" class="input-field"></td>
+        <td class="total">-</td>
+        <td><button class="btn delete-btn" style="background:#dc3545;">Delete</button></td>
+      `;
+      addInputListeners();
+      setTimeout(() => row.classList.remove('highlight'), 1000);
+    });
+
+    document.getElementById('toggleDark').addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+    });
+
+    document.getElementById('showBarChart').addEventListener('click', showBarChart);
+    document.getElementById('showPieChart').addEventListener('click', showPieChart);
+
+    document.getElementById('loadPredefined').addEventListener('click', () => {
+      const predefinedModules = [
+        { name: 'Algebre', coeff: 2 },
+        { name: 'Analyse', coeff: 4 },
+        { name: 'Algo', coeff: 4 },
+        { name: 'STRM', coeff: 2 },
+        { name: 'Probastat', coeff: 2 },
+        { name: 'OPM', coeff: 1 },
+        { name: 'TIC', coeff: 1 },
+        { name: 'Anglais', coeff: 1 },
+      ];
+
+      table.innerHTML = '';
+
+      predefinedModules.forEach(mod => {
+        const row = table.insertRow();
+        row.classList.add('highlight');
+        row.innerHTML = `
+          <td><input type="text" value="${mod.name}" class="input-field"></td>
+          <td><input type="number" min="1" value="${mod.coeff}" class="input-field"></td>
+          <td><input type="number" min="0" max="20" class="input-field"></td>
+          <td><input type="number" min="0" max="20" class="input-field"></td>
+          <td class="total">-</td>
+          <td><button class="btn delete-btn" style="background:#dc3545;">Delete</button></td>
+        `;
+      });
+
+      addInputListeners();
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      addInputListeners();
+      const firstInput = document.querySelector('tbody tr:first-child .input-field');
+      if (firstInput) {
+        firstInput.focus();
+        firstInput.select();
+      }
+    });
+  </script>
+</body>
+</html>
